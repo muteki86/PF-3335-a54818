@@ -1,4 +1,7 @@
 import graph
+import time
+from datetime import timedelta
+
 
 def default_heuristic(n, edge):
     """
@@ -6,27 +9,109 @@ def default_heuristic(n, edge):
     """
     return 0
 
+
 def astar(start, heuristic, goal):
     """
     A* search algorithm. The function is passed a start graph.Node object, a heuristic function, and a goal predicate.
-    
+
     The start node can produce neighbors as needed, see graph.py for details.
-    
+
     The heuristic is a function that takes two parameters: a node, and an edge. The algorithm uses this heuristic to determine which node to expand next.
-    Note that, unlike in classical A*, the heuristic can also use the edge used to get to a node to determine the node's heuristic value. This can be beneficial when the 
+    Note that, unlike in classical A*, the heuristic can also use the edge used to get to a node to determine the node's heuristic value. This can be beneficial when the
     edges represent complex actions (as in the planning case), and we want to take into account the differences produced by that action.
-    
+
     The goal is also represented a function, that is passed a node, and returns True if that node is a goal node, otherwise False. This representation was also chosen to
-    simplify implementing the planner later, which can use the functions developed in task 1 to determine if a state models the goal condition, 
-    but is otherwise equivalent to classical A*. 
-    
+    simplify implementing the planner later, which can use the functions developed in task 1 to determine if a state models the goal condition,
+    but is otherwise equivalent to classical A*.
+
     The function should return a 4-tuple (path,distance,visited,expanded):
         - path is a sequence of graph.Edge objects that have to be traversed to reach a goal state from the start.
-        - distance is the sum of costs of all edges in the path 
-        - visited is the total number of nodes that were added to the frontier during the execution of the algorithm 
+        - distance is the sum of costs of all edges in the path
+        - visited is the total number of nodes that were added to the frontier during the execution of the algorithm
         - expanded is the total number of nodes that were expanded (i.e. whose neighbors were added to the frontier)
     """
-    return [],0,0,0
+    G = {}  # Actual movement cost to each position from the start position
+    F = {}  # Estimated movement cost of start to end going via this position
+
+    path = []
+    distance = 0
+    visited = 0
+    expanded = 0
+
+    # Initialize starting values
+    G[start.get_id()] = 0
+    F[start.get_id()] = heuristic(start, goal)
+
+    closedVertices = []
+    openVertices = [start]
+    cameFrom = {}
+
+    while len(openVertices) > 0:
+
+		# Get the vertex in the open list with the lowest F score
+        current = None
+        currentFscore = None
+        #sort F by value
+
+        for pos in openVertices:
+                if current is None or F[pos.get_id()] < currentFscore:
+                    currentFscore = F[pos.get_id()]
+                    current = pos
+
+        # Check if we have reached the goal
+        if goal(current):
+            # Retrace our route backward
+
+            path = []
+            totalCost = 0
+            for vert in cameFrom:
+                if vert[1] == current.get_id():
+                    currentId = vert
+            
+            while currentId in cameFrom:
+                currentNode = cameFrom[currentId]
+                path.append(currentNode)
+                totalCost= totalCost + currentNode.cost
+                if(currentId[0] == start.get_id() ): 
+                    break
+                for vert in cameFrom:
+                    if vert[1] == currentId[0]:
+                        currentId = vert
+                        continue
+                
+            #path.reverse()
+            
+            return path[::-1], totalCost, visited, expanded
+            
+
+        # Mark the current vertex as closed
+        openVertices.remove(current)
+        expanded = expanded + 1
+        closedVertices.append(current)
+
+        # Update scores for vertices near the current position
+        for neighbour in current.get_neighbors():
+            
+            if neighbour.target in closedVertices: 
+                continue #We have already processed this node exhaustively
+            candidateG = G[current.get_id()] + neighbour.cost
+
+            if neighbour.target not in openVertices:
+                openVertices.append(neighbour.target) #Discovered a new vertex
+                visited = visited + 1
+            elif candidateG >= G[neighbour.target.get_id()]:
+                continue #This G score is worse than previously found
+
+            #Adopt this G score
+            cameFrom[(current.get_id(),neighbour.target.get_id())] = neighbour
+            G[neighbour.target.get_id()] = candidateG
+            H = heuristic(neighbour.target, goal)
+            F[neighbour.target.get_id()] = G[neighbour.target.get_id()] + H
+
+    raise RuntimeError("A* failed to find a solution")
+
+
+    return [], 0, 0,0
 
 def print_path(result):
     (path,cost,visited_cnt,expanded_cnt) = result
@@ -53,6 +138,7 @@ def main():
         - pathfinding on the same infinite graph, but with infinitely many goal nodes. Each node corresponding to a number greater 1000 that is congruent to 63 mod 123 is a valid goal node. As before, a non-admissible
           heuristic is provided, which greatly accelerates the search process. 
     """
+    start_time = time.time()	# LINE ADDED for track excution time for performance benchmarking
     target = "Bregenz"
     def atheuristic(n, edge):
         return graph.AustriaHeuristic[target][n.get_id()]
@@ -87,6 +173,7 @@ def main():
     
     result = astar(graph.InfNode(1), default_heuristic, multigoal)
     print_path(result)
+    print("Elapsed time: %s" % (str(timedelta(seconds= time.time() - start_time)))) # LINE ADDED to report elapsed time for performance benchmarking
     
 
 if __name__ == "__main__":
