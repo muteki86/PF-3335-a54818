@@ -168,7 +168,7 @@ def main():
     def multigoal(n):
         return n.get_id() > 1000 and n.get_id()%123 == 63
     
-    result = astar(graph.InfNode(1), infheuristic, multigoal)
+    result = astar(graph.InfNode(1), multiheuristic, multigoal)
     print_path(result)
     
     result = astar(graph.InfNode(1), default_heuristic, multigoal)
