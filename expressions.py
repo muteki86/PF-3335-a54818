@@ -135,8 +135,8 @@ class When(LogicalFormula):
             self.effect.apply(world)
 
     def substitute(self, variable, value):
-        for c in self.children:
-            c.substitute(variable, value)
+        self.effect.substitute(variable, value)
+        self.precon.substitute(variable, value)
 
 #- "exists" with exactly two parameters, where the first one is a variable specification
 class Exists(LogicalFormula):
@@ -152,7 +152,7 @@ class Exists(LogicalFormula):
         for value in values:
             subsParam = substitute(self.param2, self.variable, value)
             if subsParam.isModeledBy(world): 
-                return true
+                return True
         return False
 
     def get_new(self):
@@ -181,6 +181,17 @@ class Forall(LogicalFormula):
 
     def substitute(self, variable, value):
         self.param2.substitute(variable, value)
+
+    def apply(self, world):
+        values = world.sets[self.domain]
+        newParams = [] 
+
+        for value in values:
+            subsParam = substitute(self.param2, self.variable, value)
+            newParams.append(subsParam)
+
+        for np in newParams:
+            np.apply(world)
 
     def get_new(self):
         return (self).__class__(self.domain, self.variable,self.param2.get_new())
