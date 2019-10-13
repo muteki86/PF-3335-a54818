@@ -9,108 +9,52 @@ def default_heuristic(n, edge):
     """
     return 0
 
+def contains(frontier, node):
+    for n in frontier:
+        if n[0].get_id() == node.get_id():
+            return True
+    return False
+
+
+def updateValue(frontier, newValue):
+    for n in frontier:
+        if n[0].get_id() == newValue[0].get_id() and (n[1] + n[2]) > (newValue[1] + newValue[2]):
+            frontier.remove(n)
+            frontier.append(newValue)
+            return
+    return 
 
 def astar(start, heuristic, goal):
-    """
-    A* search algorithm. The function is passed a start graph.Node object, a heuristic function, and a goal predicate.
-
-    The start node can produce neighbors as needed, see graph.py for details.
-
-    The heuristic is a function that takes two parameters: a node, and an edge. The algorithm uses this heuristic to determine which node to expand next.
-    Note that, unlike in classical A*, the heuristic can also use the edge used to get to a node to determine the node's heuristic value. This can be beneficial when the
-    edges represent complex actions (as in the planning case), and we want to take into account the differences produced by that action.
-
-    The goal is also represented a function, that is passed a node, and returns True if that node is a goal node, otherwise False. This representation was also chosen to
-    simplify implementing the planner later, which can use the functions developed in task 1 to determine if a state models the goal condition,
-    but is otherwise equivalent to classical A*.
-
-    The function should return a 4-tuple (path,distance,visited,expanded):
-        - path is a sequence of graph.Edge objects that have to be traversed to reach a goal state from the start.
-        - distance is the sum of costs of all edges in the path
-        - visited is the total number of nodes that were added to the frontier during the execution of the algorithm
-        - expanded is the total number of nodes that were expanded (i.e. whose neighbors were added to the frontier)
-    """
-    G = {}  # Actual movement cost to each position from the start position
-    F = {}  # Estimated movement cost of start to end going via this position
-
+    
+    expanded = []
+    visited = []
     path = []
-    distance = 0
-    visited = 0
-    expanded = 0
+    frontier = []
+    
+    #path.append(start)
+    frontier.append((start, 0,heuristic(start, goal), path))
+    visited.append(start.get_id())
 
-    # Initialize starting values
-    G[start.get_id()] = 0
-    F[start.get_id()] = heuristic(start, goal)
+    while len(frontier) > 0:
+        current, cdist, h, path = frontier.pop(0)
+        if(goal(current)):
+            return path,cdist,len(visited),len(expanded)
 
-    closedVertices = []
-    openVertices = [start]
-    cameFrom = {}
+        expanded.append(current.get_id())
+        for edge in current.get_neighbors():
+            if edge.target.get_id() not in expanded:
+                cost = cdist+edge.cost
+                h = heuristic(edge.target,edge)
+                if contains(frontier, edge.target):
+                    updateValue(frontier,(edge.target,cost,h,path+[edge]))
+                else:
+                    frontier.append((edge.target,cost,h,path+[edge]))
+                    visited.append(edge.target.get_id())
+                frontier.sort(key = lambda n: n[1] + n[2])
 
-    while len(openVertices) > 0:
+    #raise RuntimeError("A* failed to find a solution")
 
-		# Get the vertex in the open list with the lowest F score
-        current = None
-        currentFscore = None
-        #sort F by value
-
-        for pos in openVertices:
-                if current is None or F[pos.get_id()] < currentFscore:
-                    currentFscore = F[pos.get_id()]
-                    current = pos
-
-        # Check if we have reached the goal
-        if goal(current):
-            # Retrace our route backward
-
-            path = []
-            totalCost = 0
-            for vert in cameFrom:
-                if vert[1] == current.get_id():
-                    currentId = vert
-            
-            while currentId in cameFrom:
-                currentNode = cameFrom[currentId]
-                path.append(currentNode)
-                totalCost= totalCost + currentNode.cost
-                if(currentId[0] == start.get_id() ): 
-                    break
-                for vert in cameFrom:
-                    if vert[1] == currentId[0]:
-                        currentId = vert
-                        continue
-                
-            #path.reverse()
-            
-            return path[::-1], totalCost, visited, expanded
-            
-
-        # Mark the current vertex as closed
-        openVertices.remove(current)
-        expanded = expanded + 1
-        closedVertices.append(current)
-
-        # Update scores for vertices near the current position
-        for neighbour in current.get_neighbors():
-            
-            if neighbour.target in closedVertices: 
-                continue #We have already processed this node exhaustively
-            candidateG = G[current.get_id()] + neighbour.cost
-
-            if neighbour.target not in openVertices:
-                openVertices.append(neighbour.target) #Discovered a new vertex
-                visited = visited + 1
-            elif candidateG >= G[neighbour.target.get_id()]:
-                continue #This G score is worse than previously found
-
-            #Adopt this G score
-            cameFrom[(current.get_id(),neighbour.target.get_id())] = neighbour
-            G[neighbour.target.get_id()] = candidateG
-            H = heuristic(neighbour.target, goal)
-            F[neighbour.target.get_id()] = G[neighbour.target.get_id()] + H
-
-    raise RuntimeError("A* failed to find a solution")
-
-
+    return None,None,len(visited),len(expanded)
     return [], 0, 0,0
 
 def print_path(result):
