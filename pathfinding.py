@@ -55,7 +55,6 @@ def astar(start, heuristic, goal):
     #raise RuntimeError("A* failed to find a solution")
 
     return None,None,len(visited),len(expanded)
-    return [], 0, 0,0
 
 def print_path(result):
     (path,cost,visited_cnt,expanded_cnt) = result

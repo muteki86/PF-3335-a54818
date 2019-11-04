@@ -249,7 +249,7 @@ def apply(world, effect):
 def make_world(atoms, sets):
     formulas = []
     for exp in atoms:
-        atom1 = Atom(exp)
+        atom1 = Atom(tuple(exp))
         formulas.append(atom1)   
 
     world = World(formulas, sets)
@@ -275,7 +275,7 @@ def make_expression(ast):
         elif ast[0] == "forall":
             return Forall(ast[1][2],ast[1][0], make_expression(ast[2]))
     else:
-        a = Atom(ast)
+        a = Atom(tuple(ast))
         return a
     return None
 

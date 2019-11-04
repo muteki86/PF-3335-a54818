@@ -67,14 +67,60 @@ def parsefile(filename):
 
 supported_reqs = [':strips', ':disjunctive-preconditions', ':typing', ':equality', ':existential-preconditions', ':universal-preconditions', ':conditional-effects', ':adl']
 
+def parseTypes(tkn, addall=False):
+    typeParam = {}
+    typevarnames = []
+    allobjs = []
+    while tkn:
+        # read names until - 
+        r = tkn.pop(0)
+        if r != "-":
+            typevarnames.append(r)
+            allobjs.append(r)
+        else: 
+            # when - , read next as type
+            typ = tkn.pop(0)
+            # insert each name with the type
+            #for pn in typevarnames:
+            #    typeParam.append((pn, typ))
+            typeParam[typ] = typevarnames
+            typevarnames = []
+    # if fin and still names in the queue, insert them as type ''
+    if addall: 
+        typeParam[""] = allobjs
+    return typeParam
+
+def parseParams(tkn):
+    typeParam = {}
+    typevarnames = ''
+    while tkn:
+        # read names until - 
+        r = tkn.pop(0)
+        if r.startswith("?"):
+            typevarnames = r
+            if not tkn:
+                typeParam[typevarnames] = ""
+            else:
+                r = tkn.pop(0)
+                if r != "-":
+                    typeParam[typevarnames] = ""
+                else: 
+                    # when - , read next as type
+                    typ = tkn.pop(0)
+                    # insert each name with the type
+                    #for pn in typevarnames:
+                    #    typeParam.append((pn, typ))
+                    typeParam[typevarnames] = typ
+    return typeParam
+
 def parse_domain(fname):
     
     domain_name = ''
     requirements = []
-    types = []
+    types = {}
     actions = []
     predicates = []
-    constants = []
+    constants = {}
 
     tokens = parsefile(fname)
     tkn = tokens.pop(0)
@@ -91,38 +137,18 @@ def parse_domain(fname):
                             raise Exception('Invalid requirement:' + req)
                 requirements = tkn
             elif hdr == ':types':
-                types = tkn
+                types = parseTypes(tkn)
             elif hdr == ':constants':
-                acon = tkn 
-                while acon:
-                    acn = acon.pop(0)
-                    acd = acon.pop(0)
-                    act = acon.pop(0)
-                    constants.append((acn, act))
+                constants = parseTypes(tkn, True)
             elif hdr == ':predicates':
                 while tkn:
                     apred = tkn.pop(0) # read predicate
                     while apred:
                         predname = apred.pop(0) # read name
-                        predparams = []
-                        predvarnames = []
-                        while apred:
-                            # read names until - 
-                            r = apred.pop(0)
-                            if r != "-":
-                                predvarnames.append(r)
-                            else: 
-                                # when - , read next as type
-                                typ = apred.pop(0)
-                                # insert each name with the type
-                                for pn in predvarnames:
-                                    predparams.append((pn, typ))
-                                predvarnames = []
-                        # if fin and still names in the queue, insert them as type ''
-                        for pn in predvarnames:
-                            predparams.append((pn, ''))
+                        predParams = []
+                        predParams = parseTypes(apred)
+                        predicates.append(Predicate(predname, predParams))
 
-                        predicates.append(Predicate(predname, predparams))
             elif hdr == ':action':
                 aname = tkn.pop(0)
                 aparameters = []
@@ -132,17 +158,7 @@ def parse_domain(fname):
                     atkn = tkn.pop(0)
                     if atkn == ':parameters':
                         aparam = tkn.pop(0) # get the parameters
-                        while aparam: # while we have info in the parameters
-                            p = aparam.pop(0) # parameter name
-                            if len(aparam) > 0:
-                                d = aparam.pop(0)
-                                if d == "-":
-                                    typ = aparam.pop(0) # type
-                                    aparameters.append((p,typ)) # add (parameter, type)
-                                else:
-                                    aparameters.append((p,''))
-                            else:
-                                aparameters.append((p,''))
+                        aparameters = parseParams(aparam)
                     elif atkn == ':precondition':
                         aprecondition = tkn.pop(0)
                     elif atkn == ':effect':
@@ -156,7 +172,6 @@ def parse_problem(fname):
     domain_name = ''
     objects = []
     init = []
-    goal = []
 
     tokens = parsefile(fname)
     tkn = tokens.pop(0)
@@ -169,26 +184,11 @@ def parse_problem(fname):
             elif hdr == 'problem':
                 problem = tkn[0]
             elif hdr == ':objects':
-                 # read predicate
-                objvarnames = []
-                while tkn:
-                    objname = tkn.pop(0) # read name
-                    if objname != "-":
-                        objvarnames.append(objname)
-                    else: 
-                        # when - , read next as type
-                        typ = tkn.pop(0)
-                        # insert each name with the type
-                        for pn in objvarnames:
-                            objects.append((pn, typ))
-                        objvarnames = []
-                # if fin and still names in the queue, insert them as type ''
-                for pn in objname:
-                    objects.append((pn, ''))
+                objects = parseTypes(tkn, True)
             elif hdr == ':init':
                 init = tkn
             elif hdr == ':goal':
-                goal = tkn
+                goal = expressions.make_expression(tkn.pop(0))
 
     return Problem(problem, domain_name, objects, init, goal)
     
