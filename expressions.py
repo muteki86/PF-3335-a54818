@@ -58,9 +58,9 @@ class Or(LogicalFormula):
 
     def isModeledBy(self, world):
         for c in self.children:
-            if c.isModeledBy(world):
-                return True
-        return False
+            if not c.isModeledBy(world):
+                return False
+        return True
     
     def substitute(self, variable, value):
         for c in self.children:
@@ -265,7 +265,7 @@ def make_expression(ast):
         elif ast[0] == "not":
             return Not(make_expression(ast[1]))
         elif ast[0] == "=":
-            return Equals(make_expression(ast[1]), make_expression(ast[2]))
+            return Equals(ast[1], ast[2])
         elif ast[0] == "imply":
             return Imply(make_expression(ast[1]), make_expression(ast[2]))
         elif ast[0] == "when":

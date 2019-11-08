@@ -7,6 +7,7 @@ import sys
 import copy
 import re
 
+
 groundedActions = []
 
 #substitute the var for the value in a list of strings.
@@ -61,6 +62,38 @@ def groundActions(actions, objs):
         groundedActions.extend(groundRec(ppact, act, newparams))
     return groundedActions
 
+def mergeObjsRec(key, vals, items, objs):
+    allobjs = []
+    #items.pop(key, None)
+    for val in vals:
+        if val in objs:
+            allobjs.extend(objs[val])
+        else:
+            allobjs.extend(mergeObjsRec(val,items[val], items, objs))
+    return allobjs
+
+def mergeObjs(domain, problem):
+
+    # get a list of problem objecst + domain constants
+    allobjs = dict(domain.constants)
+    for k, v in problem.objects.items():
+        allobjs[k] = allobjs[k]+v  if k in allobjs else v
+
+    # add the values for the hierarchy types
+    types = copy.deepcopy(domain.types)
+    alltyps = {}
+
+    for k, v in types.items():
+        items = copy.deepcopy(domain.types)
+        items.pop(k, None)
+        alltyps[k] = []
+        alltyps[k] = mergeObjsRec(k, v, items, allobjs)
+
+    # get a list of objects + hierarchy objs
+    for k, v in alltyps.items():
+        allobjs[k] = allobjs[k]+v  if k in allobjs else v
+
+    return allobjs
 
 class PlanNode(graph.Node):
     
@@ -85,7 +118,7 @@ class PlanNode(graph.Node):
         return self.neighbours
 
     def get_id(self):
-        return self.name + str(self.state.formulas)
+        return str(sorted(self.state.formulas, key=lambda x:str(x.getValue()) ))
 
 def plan(domain, problem, useheuristic=True):
 
@@ -94,12 +127,10 @@ def plan(domain, problem, useheuristic=True):
         
     def isgoal(state):
         return expressions.models(state.state, problem.goal)
-    # get a list of problem objecst + domain constants
-    #problem.objects.update(domain.constants)
-    allobjs = dict(domain.constants)
-
-    for k, v in problem.objects.items():
-        allobjs[k] = allobjs[k]+v  if k in allobjs else v
+    
+    #get all objects applying the typinh hierarchy
+    allobjs = mergeObjs(domain, problem)
+    
     # get all grounded actions
     groundActions(domain.actions, allobjs)
 
@@ -120,8 +151,6 @@ def main(domain, problem, useheuristic):
     
 
 if __name__ == "__main__":
-    #main(sys.argv[1], sys.argv[2], "-d" not in sys.argv)
-    #main("domain.pddl", "wumpusproblem.pddl", False)
-    #main("elevators_domain.pddl", "elevators_s0.pddl", False)
-    main("./problems/classical/elevators-00-adl/domain.pddl", "./problems/classical/elevators-00-adl/s1-1.pddl", False)
+    main(sys.argv[1], sys.argv[2], "-d" not in sys.argv)
+    
     

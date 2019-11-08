@@ -72,45 +72,42 @@ def parseTypes(tkn, addall=False):
     typevarnames = []
     allobjs = []
     while tkn:
-        # read names until - 
         r = tkn.pop(0)
         if r != "-":
             typevarnames.append(r)
             allobjs.append(r)
         else: 
-            # when - , read next as type
             typ = tkn.pop(0)
-            # insert each name with the type
-            #for pn in typevarnames:
-            #    typeParam.append((pn, typ))
-            typeParam[typ] = typevarnames
+            if typ in typeParam:
+                typeParam[typ] = typeParam[typ] + typevarnames
+            else:
+                typeParam[typ] =  typevarnames
+            
             typevarnames = []
     # if fin and still names in the queue, insert them as type ''
+    if len(typevarnames) > 0:
+        typeParam[""] = typevarnames
     if addall: 
         typeParam[""] = allobjs
     return typeParam
 
 def parseParams(tkn):
     typeParam = {}
-    typevarnames = ''
+    typevarnames = []
     while tkn:
-        # read names until - 
         r = tkn.pop(0)
         if r.startswith("?"):
-            typevarnames = r
-            if not tkn:
-                typeParam[typevarnames] = ""
-            else:
-                r = tkn.pop(0)
-                if r != "-":
-                    typeParam[typevarnames] = ""
-                else: 
-                    # when - , read next as type
-                    typ = tkn.pop(0)
-                    # insert each name with the type
-                    #for pn in typevarnames:
-                    #    typeParam.append((pn, typ))
-                    typeParam[typevarnames] = typ
+            typevarnames.append(r)
+        else:
+            if r == "-":
+                typ = tkn.pop(0)
+                for pr in typevarnames:
+                    typeParam[pr] = typ
+                typevarnames = []
+    
+    if len(typevarnames) > 0:
+        for pr in typevarnames:
+            typeParam[pr] = ""
     return typeParam
 
 def parse_domain(fname):
@@ -193,9 +190,6 @@ def parse_problem(fname):
     return Problem(problem, domain_name, objects, init, goal)
     
 if __name__ == "__main__":
-    print(parse_domain("domain.pddl"))
-    print(parse_problem("wumpusproblem.pddl"))
-
-    #print(parse_domain(sys.argv[1]))
-    #print(parse_problem(sys.argv[2]))
+    print(parse_domain(sys.argv[1]))
+    print(parse_problem(sys.argv[2]))
 
