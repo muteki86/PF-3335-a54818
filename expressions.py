@@ -58,9 +58,9 @@ class Or(LogicalFormula):
 
     def isModeledBy(self, world):
         for c in self.children:
-            if not c.isModeledBy(world):
-                return False
-        return True
+            if c.isModeledBy(world):
+                return True
+        return False
     
     def substitute(self, variable, value):
         for c in self.children:
