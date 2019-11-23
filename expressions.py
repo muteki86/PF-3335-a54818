@@ -12,6 +12,14 @@ class World:
     def get_new(self):
         return (self).__class__(copy.deepcopy(self.formulas), copy.deepcopy(self.sets))
 
+    def __eq__(self, other):
+        selfFormulas = str(sorted(self.formulas, key=lambda x: str(x.getValue())))
+        otherFormulas = str(sorted(other.formulas, key=lambda x: str(x.getValue())))
+
+        if selfFormulas == otherFormulas:
+            return True
+        return False
+
 class LogicalFormula:
 
     isRelaxed = False

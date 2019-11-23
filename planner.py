@@ -124,82 +124,137 @@ class PlanNode(graph.Node):
     def get_id(self):
         return str(sorted(self.state.formulas, key=lambda x: str(x.getValue())))
 
-class HeuristicNode(graph.Node):
-    neighbours = []
-
-    def __init__(self, name, state, objs):
-        self.name = name
-        self.state = state
-        self.objs = objs
-
-    def get_neighbors(self):
-        # for each grounded action
-        for ac in groundedActions:
-            # if the action is modeled in the state
-            if expressions.models(self.state, expressions.make_expression(ac.precondition)):
-                ## apply the effect to the world
-                newstate = expressions.apply(self.state, expressions.make_expression(ac.effect, True))
-                ## add state to the neighbours list as an edge
-                nt = HeuristicNode(ac.name, newstate, self.objs)
-                ne = graph.Edge(nt, 1, ac.name)
-                self.neighbours.append(ne)
-        return self.neighbours
-
-    def get_id(self):
-        return str(sorted(self.state.formulas, key=lambda x: str(x.getValue())))
-
-
 def get_goal_atoms(goal):
     goals = []
-
-    if goal[0] in ["and", "or", "not", "=", "imply", "when", "exists", "forall"]:
-        goals.extend(get_goal_atoms(goal[1:]))
-    else:
-        goals.append(goal)
-        return goals
+    
+    if goal:
+        if goal[0] in ["and", "or", "not", "=", "imply", "when", "exists", "forall"]:
+            goals.extend(get_goal_atoms(goal[1:]))
+        else:
+            if isinstance(goal, list):
+                goals.append(expressions.Atom(tuple(goal[0])))
+                goals.extend(get_goal_atoms(goal[1:]))
+            else:
+                goals.append(expressions.Atom(tuple(goal)))
+            return goals
     return goals
 
-# # ### & &&& / #& #&&# # ### & #&
+
+def computeRPG(actions, start, isgoal):
+    
+    fluents = []
+    actionsApplied = []
+    executedActionEffects = {}
+
+    #initialize
+    fluents.append(copy.deepcopy(start))
+    actionsApplied.append([])
+    t = 0
+    
+    while not isgoal(fluents[t]): # while goal is not in the layer
+        t += 1
+        actionsApplied.append([])
+        for rac in groundedActions: # find the actions that can be applied
+            if expressions.models(fluents[t-1].state, expressions.make_expression(rac.precondition)):
+                actionsApplied[t].append(rac)
+        
+        fluents.append(copy.deepcopy(fluents[t-1])) # copy the fluents of last layer
+
+        for act in actionsApplied[t]: #apply the actions to this  layer 
+            actionEffects = expressions.apply(fluents[t].state, expressions.make_expression( act.effect, True))
+            aef = []
+            for atm in actionEffects.formulas:
+                    if atm not in fluents[t].state.formulas:
+                        aef.append(atm)
+                        fluents[t].state.formulas.append(atm)
+                    if len(aef) > 0:
+                        executedActionEffects[str(t)+act.name] = aef
+
+        if t>0 and fluents[t].state == fluents[t-1].state: # if the new state is no different than the last one, fail
+            return None, None, None
+
+    return fluents, actionsApplied, executedActionEffects
+
+## get the state layer level a goal first appears
+def firstLevel(goal, slayer):
+    m = 0
+    for sl in slayer:
+        if goal in sl.state.formulas:
+            return m
+        m+=1
+    return m
+
+# get the first action layer an action first appears
+def firstLevelAction(action, alayer):
+    m = 0
+    for al in alayer:
+        a = [x for x in al if x.name == action.name]
+        if a:
+            return m
+        m+=1
+    return m
+
+# get the relaxed plan size
+def extractRPSize(slayer, alayer, goals, executedActionEffects):
+    m = 0 
+    actionsInPlan = []
+    # get the last layer a goal is found
+    for g in goals:
+        m1 = firstLevel(g, slayer)
+        if m1>m: m = m1
+    #print(m)
+    
+    # check where the goals at in the state layers
+    Gt = {}
+    goalschecked = []
+    for t in range(0, m+1): 
+        gt=[]
+        for g in goals:
+            m1 = firstLevel(g, slayer)
+            if m1 == t and g not in goalschecked:
+                gt.append(g)
+                goalschecked.append(g)
+        Gt[t] = gt
+    
+    for t in reversed(range(1, m+1)):
+        for g in Gt[t]:
+            for act in alayer[t]:
+                # check if this action generates the goal
+                if expressions.models(expressions.make_world([g.getValue()], {}), expressions.make_expression(act.effect)):
+                    # if it does, get the first layer this action is introduced
+                    if firstLevelAction(act, alayer) == t:
+                        # if it is the same layer we are right now, add the preconditions to G in the fluent level they first appear
+                        
+                        precondAtoms = get_goal_atoms(act.precondition)
+                        for pa in precondAtoms:
+                            m1 = firstLevel(pa, slayer)
+                            fls = Gt[m1]
+                            if pa not in fls:
+                                fls.append(pa)
+                            Gt[m1] = fls
+                        actionsInPlan.append(act) # add this action to the plan
+    return len(actionsInPlan)
+
+
+# ### - #-     #### # ##- #-# ## ### - ## -#-# #-     # ###     -### #- --## --- ##-# ## #-
 def SuperHeuristic(state, action, init, goal, allobjs, isgoal):
     
     # apply action
     supervalue = 0
     actionsApplied = 0
+
     if isinstance(action, graph.Edge):
         newstate = copy.deepcopy(action.target)
     else:
         newstate = copy.deepcopy(state)
-    #goalAtoms = get_goal_atoms(goal)
     
+    stateLayers, actionLayers, executedActionEffects = computeRPG(groundedActions, newstate, isgoal) # get relaxed graph
+    if stateLayers and actionLayers:
+        rpsize = extractRPSize(stateLayers, actionLayers, get_goal_atoms(goal), executedActionEffects) # get plan size from relaxed graph
+    else:
+        return 100000
 
-    while not isgoal(newstate):              
-
-        wutnewstate = copy.deepcopy(newstate)
-        for rac in groundedActions:
-            if expressions.models(newstate.state, expressions.make_expression(rac.precondition)):
-                
-                bururu = expressions.apply(newstate.state, expressions.make_expression( rac.effect, True))
-                for atm in bururu.formulas:
-                    if atm not in wutnewstate.state.formulas:
-                        wutnewstate.state.formulas.append(atm)
-
-                actionsApplied = actionsApplied + 1
-        if actionsApplied == 0:
-            return 1000
-        actionsApplied = 0
-        supervalue = supervalue + 1
-        newstate = copy.deepcopy(wutnewstate)
-
-    # return path size    
-    return supervalue
-    
-    #break goal into atoms
-
-    #goalAtoms = get_goal_atoms(goal)
-    '''start = HeuristicNode("init", state.state, allobjs)
-    (path, cost, visited_cnt, expanded_cnt) = pathfinding.astar(start, pathfinding.default_heuristic, isgoal)
-    return len(path)'''
-    
+    return rpsize
 
 def plan(domain, problem, useheuristic=True):
     # get all objects applying the typinh hierarchy
