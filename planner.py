@@ -220,11 +220,11 @@ def extractRPSize(slayer, alayer, goals, executedActionEffects):
         for g in Gt[t]:
             for act in alayer[t]:
                 # check if this action generates the goal
-                if expressions.models(expressions.make_world([g.getValue()], {}), expressions.make_expression(act.effect)):
+                #if expressions.models(expressions.make_world([g.getValue()], {}), expressions.make_expression(act.effect)):
+                if str(t)+act.name in executedActionEffects:
                     # if it does, get the first layer this action is introduced
                     if firstLevelAction(act, alayer) == t:
                         # if it is the same layer we are right now, add the preconditions to G in the fluent level they first appear
-                        
                         precondAtoms = get_goal_atoms(act.precondition)
                         for pa in precondAtoms:
                             m1 = firstLevel(pa, slayer)
@@ -289,6 +289,5 @@ def main(domain, problem, useheuristic):
 
 
 if __name__ == "__main__":
-    # main(sys.argv[1], sys.argv[2], "-d" not in sys.argv)
-    main("problems/classical/airport/p06-domain.pddl", "problems/classical/airport/p06-airport2-p2.pddl", True)
+    main(sys.argv[1], sys.argv[2], "-d" not in sys.argv)
     
