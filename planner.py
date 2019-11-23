@@ -100,30 +100,6 @@ def mergeObjs(domain, problem):
 
     return allobjs
 
-
-def remove_nopes(effect):
-    nef = []
-    for e in effect:
-        if isinstance(e, list):
-            nopes = remove_nopes(e)
-            if nopes is not None:
-                nef.append(nopes)
-        else:
-            if e != "not":
-                nef.append(e)
-            else:
-                return nef if len(nef) > 0 else None
-    return nef if len(nef) > 0 else None
-
-
-def get_relaxed_actions():
-    for ga in groundedActions:
-        nga = copy.deepcopy(ga)
-        nga.effect = remove_nopes(nga.effect)
-
-        relaxedActions.append(nga)
-
-
 class PlanNode(graph.Node):
     neighbours = []
 
@@ -148,24 +124,82 @@ class PlanNode(graph.Node):
     def get_id(self):
         return str(sorted(self.state.formulas, key=lambda x: str(x.getValue())))
 
-def SuperHeuristic(state, action, isgoal):
+class HeuristicNode(graph.Node):
+    neighbours = []
+
+    def __init__(self, name, state, objs):
+        self.name = name
+        self.state = state
+        self.objs = objs
+
+    def get_neighbors(self):
+        # for each grounded action
+        for ac in groundedActions:
+            # if the action is modeled in the state
+            if expressions.models(self.state, expressions.make_expression(ac.precondition)):
+                ## apply the effect to the world
+                newstate = expressions.apply(self.state, expressions.make_expression(ac.effect, True))
+                ## add state to the neighbours list as an edge
+                nt = HeuristicNode(ac.name, newstate, self.objs)
+                ne = graph.Edge(nt, 1, ac.name)
+                self.neighbours.append(ne)
+        return self.neighbours
+
+    def get_id(self):
+        return str(sorted(self.state.formulas, key=lambda x: str(x.getValue())))
+
+
+def get_goal_atoms(goal):
+    goals = []
+
+    if goal[0] in ["and", "or", "not", "=", "imply", "when", "exists", "forall"]:
+        goals.extend(get_goal_atoms(goal[1:]))
+    else:
+        goals.append(goal)
+        return goals
+    return goals
+
+# # ### & &&& / #& #&&# # ### & #&
+def SuperHeuristic(state, action, init, goal, allobjs, isgoal):
+    
     # apply action
     supervalue = 0
     actionsApplied = 0
-    newstate = copy.deepcopy(state)
+    if isinstance(action, graph.Edge):
+        newstate = copy.deepcopy(action.target)
+    else:
+        newstate = copy.deepcopy(state)
+    #goalAtoms = get_goal_atoms(goal)
+    
 
-    while not isgoal(newstate):
-        for rac in relaxedActions:
+    while not isgoal(newstate):              
+
+        wutnewstate = copy.deepcopy(newstate)
+        for rac in groundedActions:
             if expressions.models(newstate.state, expressions.make_expression(rac.precondition)):
-                newstate.state = expressions.apply(newstate.state, expressions.make_expression( rac.effect))
+                
+                bururu = expressions.apply(newstate.state, expressions.make_expression( rac.effect, True))
+                for atm in bururu.formulas:
+                    if atm not in wutnewstate.state.formulas:
+                        wutnewstate.state.formulas.append(atm)
+
                 actionsApplied = actionsApplied + 1
         if actionsApplied == 0:
             return 1000
         actionsApplied = 0
         supervalue = supervalue + 1
-    # return path size
-    return supervalue
+        newstate = copy.deepcopy(wutnewstate)
 
+    # return path size    
+    return supervalue
+    
+    #break goal into atoms
+
+    #goalAtoms = get_goal_atoms(goal)
+    '''start = HeuristicNode("init", state.state, allobjs)
+    (path, cost, visited_cnt, expanded_cnt) = pathfinding.astar(start, pathfinding.default_heuristic, isgoal)
+    return len(path)'''
+    
 
 def plan(domain, problem, useheuristic=True):
     # get all objects applying the typinh hierarchy
@@ -173,13 +207,14 @@ def plan(domain, problem, useheuristic=True):
 
     # get all grounded actions
     groundActions(domain.actions, allobjs)
-    get_relaxed_actions()
+    goalExp = expressions.make_expression(problem.goal)
+  
+    def isgoal(state):
+        return expressions.models(state.state, goalExp)
 
     def heuristic(state, action):
-        return SuperHeuristic(state, action, isgoal)  # pathfinding.default_heuristic
+        return SuperHeuristic(state, action, problem.init, problem.goal, allobjs, isgoal)  # pathfinding.default_heuristic
 
-    def isgoal(state):
-        return expressions.models(state.state, problem.goal)
 
     start = PlanNode("init", expressions.make_world(problem.init, allobjs), allobjs)
     return pathfinding.astar(start, heuristic if useheuristic else pathfinding.default_heuristic, isgoal)
@@ -200,8 +235,5 @@ def main(domain, problem, useheuristic):
 
 if __name__ == "__main__":
     # main(sys.argv[1], sys.argv[2], "-d" not in sys.argv)
-    # main("weird_domain.pddl", "weird_problem2.pddl", False)
-    #main("domain.pddl", "wumpusproblem.pddl", True)
     main("problems/classical/airport/p06-domain.pddl", "problems/classical/airport/p06-airport2-p2.pddl", True)
-    
     

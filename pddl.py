@@ -185,7 +185,7 @@ def parse_problem(fname):
             elif hdr == ':init':
                 init = tkn
             elif hdr == ':goal':
-                goal = expressions.make_expression(tkn.pop(0))
+                goal = tkn.pop(0)
 
     return Problem(problem, domain_name, objects, init, goal)
     

@@ -3,6 +3,7 @@ import time
 import copy
 from datetime import timedelta
 
+
 class World:
     def __init__(self, formulas, sets):
         self.formulas = formulas
@@ -12,6 +13,9 @@ class World:
         return (self).__class__(copy.deepcopy(self.formulas), copy.deepcopy(self.sets))
 
 class LogicalFormula:
+
+    isRelaxed = False
+
     def isModeledBy(self, world):
         return False
 
@@ -197,8 +201,9 @@ class Forall(LogicalFormula):
         return (self).__class__(self.domain, self.variable,self.param2.get_new())
 
 class Atom(LogicalFormula):
-    def __init__(self, param1):
+    def __init__(self, param1, isRelaxed=False):
         self.param1 = param1
+        self.isRelaxed = isRelaxed
         super(LogicalFormula, self).__init__()
     
     def getValue(self):
@@ -213,13 +218,18 @@ class Atom(LogicalFormula):
     def __repr__(self):
         return str(self.param1)
 
+    def __eq__(self, other):
+        if self.param1 == other.param1:
+            return True
+        return False
+
     def get_new(self):
         return (self).__class__(self.param1+tuple())
     
     def apply(self, world, isDelete=False):
         for t in world.formulas:
             if self.param1 == t.getValue():
-                if isDelete:
+                if isDelete and not self.isRelaxed:
                     world.formulas.remove(t)
                     return
                 else: 
@@ -254,28 +264,28 @@ def make_world(atoms, sets):
 
     world = World(formulas, sets)
     return world
-    
-def make_expression(ast):
+
+def make_expression(ast, isRelaxed=False):
     if ast[0] in ["and", "or", "not", "=", "imply", "when", "exists", "forall"]:
         if ast[0] == "and" or ast[0] == "or":
             children = []
             for c in ast[1:]:
-                children.append(make_expression(c))
+                children.append(make_expression(c,isRelaxed))
             return And(children) if ast[0] == "and" else Or(children)
         elif ast[0] == "not":
-            return Not(make_expression(ast[1]))
+            return Not(make_expression(ast[1],isRelaxed))
         elif ast[0] == "=":
             return Equals(ast[1], ast[2])
         elif ast[0] == "imply":
-            return Imply(make_expression(ast[1]), make_expression(ast[2]))
+            return Imply(make_expression(ast[1],isRelaxed), make_expression(ast[2],isRelaxed))
         elif ast[0] == "when":
-            return When(make_expression(ast[1]), make_expression(ast[2]))
+            return When(make_expression(ast[1],isRelaxed), make_expression(ast[2],isRelaxed))
         elif ast[0] == "exists":
-            return Exists(ast[1][2], ast[1][0], make_expression(ast[2]))
+            return Exists(ast[1][2], ast[1][0], make_expression(ast[2],isRelaxed))
         elif ast[0] == "forall":
-            return Forall(ast[1][2],ast[1][0], make_expression(ast[2]))
+            return Forall(ast[1][2],ast[1][0], make_expression(ast[2],isRelaxed))
     else:
-        a = Atom(tuple(ast))
+        a = Atom(tuple(ast), isRelaxed)
         return a
     return None
 
